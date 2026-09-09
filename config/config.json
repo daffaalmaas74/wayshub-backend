@@ -1,9 +1,10 @@
 {
   "development": {
-    "username": "root",
-    "password": "root",
+    "username": "daffaalmaas",
+    "password": "remotAC123_",
     "database": "wayshub",
-    "host": "127.0.0.1",
+    "host": "20.194.156.166",
+    "port": 3306,
     "dialect": "mysql"
   },
   "test": {

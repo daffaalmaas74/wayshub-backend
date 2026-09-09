@@ -1,0 +1,91 @@
+def secret = 'server-backend'
+def server = 'daffaalmaas@48.193.43.98'
+def directory = 'wayshub-backend'
+def branch = 'master'
+
+pipeline {
+    agent any
+
+    stages {
+
+        stage('pull code baru') {
+            steps {
+                sshagent([secret]) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${server} << EOF
+                        cd ${directory}
+                        git pull origin ${branch}
+                        exit
+                        EOF
+                    """
+                }
+            }
+        }
+
+        stage('build aplikasi') {
+            steps {
+                sshagent([secret]) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${server} << EOF
+                        cd ${directory}
+                        docker compose build
+                        exit
+                        EOF
+                    """
+                }
+            }
+        }
+
+        stage('push ke registry') {
+            steps {
+                sshagent([secret]) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${server} << EOF
+                        cd ${directory}
+                        docker compose push 
+                        exit
+                        EOF
+                    """
+                }
+            }
+        }
+
+        stage('deploy') {
+            steps {
+                sshagent([secret]) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${server} << EOF
+                        cd ${directory}
+                        docker compose down
+                        docker compose up -d
+                        exit
+                        EOF
+                    """
+                }
+            }
+        }
+    }
+   post {
+    success {
+        withCredentials([string(credentialsId: 'discord-webhook', variable: 'DISCORD_WEBHOOK')]) {
+            discordSend(
+                webhookURL: DISCORD_WEBHOOK,
+                title: "Jenkins Build SUCCESS",
+                description: "wayshub-backend berhasil di-build dan deploy.",
+                result: "SUCCESS"
+            )
+        }
+    }
+
+    failure {
+        withCredentials([string(credentialsId: 'discord-webhook', variable: 'DISCORD_WEBHOOK')]) {
+            discordSend(
+                webhookURL: DISCORD_WEBHOOK,
+                title: "Jenkins Build FAILED",
+                description: "wayshub-backend gagal di-build atau deploy.",
+                result: "FAILURE"
+            )
+        }
+    }
+}
+}

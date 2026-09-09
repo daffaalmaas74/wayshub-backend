@@ -1,0 +1,10 @@
+services:
+  backend:
+    build: .
+    image: daffaalmaas74/wayshub-backend:latest
+
+    container_name: wayshub-backend
+    ports:
+      - "5000:5000"
+
+    restart: unless-stopped
