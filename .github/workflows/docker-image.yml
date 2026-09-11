@@ -9,7 +9,7 @@ on:
 
 jobs:
 
-  build:
+  pull-code:
     runs-on: ubuntu-22.04
     environment: development
 
@@ -19,7 +19,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
 
-      - name: Build image testing
+      - name: Pull code
         env:
           BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
         run: |
@@ -28,16 +28,12 @@ jobs:
 
           cd ~/wayshub-backend
 
-          docker compose down
-
-          docker build \
-            -t wayshub-backend:testing \
-            .
+          git pull origin master
           EOF
 
 
   testing:
-    needs: build
+    needs: pull-code
     runs-on: ubuntu-22.04
     environment: development
 
@@ -55,6 +51,12 @@ jobs:
           set -e
 
           cd ~/wayshub-backend
+
+          docker compose down
+
+          docker build \
+            -t wayshub-backend:testing \
+            .
 
           docker rm -f backend-testing 2>/dev/null || true
 
@@ -130,7 +132,6 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
-         
 
       - name: Push image
         env:
@@ -170,6 +171,6 @@ jobs:
           set -e
 
           cd ~/wayshub-backend
-          
+
           docker compose up -d --no-build
           EOF
