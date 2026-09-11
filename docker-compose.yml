@@ -1,10 +1,16 @@
 services:
   backend:
     build: .
-    image: daffaalmaas74/wayshub-backend:latest
+    image: daffaalmaas74/wayshub-backend:development
 
     container_name: wayshub-backend
     ports:
       - "5000:5000"
 
     restart: unless-stopped
+    networks:
+      - daffaalmaas
+
+networks:
+  daffaalmaas:
+    external: true
