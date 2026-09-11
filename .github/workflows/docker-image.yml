@@ -198,7 +198,7 @@ jobs:
             -d '{
               "embeds": [{
                 "title": "GitHub Actions FAILED",
-                "description": "wayshub-backend gagal pada proses pipeline.",
+                "description": "wayshub-backend gagal di proses pipeline.",
                 "color": 15548997
               }]
             }' \
