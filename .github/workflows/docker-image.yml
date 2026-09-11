@@ -8,6 +8,7 @@ on:
     branches: ["master"]
 
 jobs:
+
   build:
     runs-on: ubuntu-22.04
     environment: development
@@ -18,11 +19,12 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
 
-      - name: Build image
+      - name: Build image testing
         env:
           BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
         run: |
           ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
+          set -e
 
           cd ~/wayshub-backend
 
@@ -31,8 +33,8 @@ jobs:
           docker build \
             -t wayshub-backend:testing \
             .
-
           EOF
+
 
   testing:
     needs: build
@@ -50,6 +52,7 @@ jobs:
           BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
         run: |
           ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
+          set -e
 
           cd ~/wayshub-backend
 
@@ -68,29 +71,32 @@ jobs:
             -s \
             -o /dev/null \
             -w "%{http_code}" \
-            http://localhost:5000)
+            http://localhost:5000 || true)
 
           if [ "$HTTP_CODE" -ge 100 ] && [ "$HTTP_CODE" -lt 500 ]; then
 
               docker stop backend-testing
               docker rm backend-testing
 
+              docker rmi wayshub-backend:testing
+
           else
 
-              docker logs backend-testing
+              docker logs backend-testing || true
 
               docker stop backend-testing || true
               docker rm backend-testing || true
 
-              docker compose up -d
+              docker rmi wayshub-backend:testing || true
+
+              docker compose up -d --no-build
 
               exit 1
-
           fi
-
           EOF
 
-  push:
+
+  build-development:
     needs: testing
     runs-on: ubuntu-22.04
     environment: development
@@ -101,6 +107,31 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
 
+      - name: Build image development
+        env:
+          BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
+        run: |
+          ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
+          set -e
+
+          cd ~/wayshub-backend
+
+          docker compose build
+          EOF
+
+
+  push:
+    needs: build-development
+    runs-on: ubuntu-22.04
+    environment: development
+
+    steps:
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
+         
+
       - name: Push image
         env:
           BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
@@ -108,6 +139,7 @@ jobs:
           DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
         run: |
           ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << EOF
+          set -e
 
           cd ~/wayshub-backend
 
@@ -115,14 +147,9 @@ jobs:
             -u "${DOCKER_USERNAME}" \
             -p "${DOCKER_TOKEN}"
 
-          docker tag \
-            wayshub-backend:testing \
-            daffaalmaas74/wayshub-backend:development
-
-          docker push \
-            daffaalmaas74/wayshub-backend:development
-
+          docker compose push
           EOF
+
 
   deploy:
     needs: push
@@ -140,13 +167,11 @@ jobs:
           BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
         run: |
           ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
+          set -e
 
           cd ~/wayshub-backend
 
           docker compose pull
 
-          docker compose down
-
-          docker compose up -d
-
+          docker compose up -d --no-build
           EOF
