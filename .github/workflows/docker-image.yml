@@ -49,7 +49,7 @@ jobs:
           BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
 
         run: |
-          ssh -o StrictHostKeyChecking=no "$SERVER_BACKEND" << 'EOF'
+          ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
 
           docker pull daffaalmaas74/wayshub-backend:development
 
@@ -98,7 +98,7 @@ jobs:
           BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
 
         run: |
-          ssh -o StrictHostKeyChecking=no "$SERVER_BACKEND" << 'EOF'
+          ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
 
           cd ~/wayshub-backend
 
