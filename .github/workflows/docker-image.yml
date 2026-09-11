@@ -98,7 +98,7 @@ jobs:
           EOF
 
 
-  build-development:
+  build:
     needs: testing
     runs-on: ubuntu-22.04
     environment: development
@@ -122,8 +122,8 @@ jobs:
           EOF
 
 
-  push:
-    needs: build-development
+  push-registry:
+    needs: build
     runs-on: ubuntu-22.04
     environment: development
 
@@ -153,7 +153,7 @@ jobs:
 
 
   deploy:
-    needs: push
+    needs: push-registry
     runs-on: ubuntu-22.04
     environment: development
 
