@@ -19,8 +19,7 @@ jobs:
 
       - name: Build image
         run: |
-          docker build \
-            -t daffaalmaas74/wayshub-backend:development .
+          docker compose build
 
       - name: Docker login
         uses: docker/login-action@v3
