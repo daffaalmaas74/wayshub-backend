@@ -174,3 +174,32 @@ jobs:
 
           docker compose up -d --no-build
           EOF
+      - name: Discord SUCCESS
+        if: success()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "GitHub Actions SUCCESS",
+                "description": "wayshub-backend berhasil pull,test,build, dan deploy.",
+                "color": 5763719
+              }]
+            }' \
+            "$DISCORD_WEBHOOK"
+
+      - name: Discord FAILED
+        if: failure()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "GitHub Actions FAILED",
+                "description": "wayshub-backend gagal pada proses pipeline.",
+                "color": 15548997
+              }]
+            }' \
+            "$DISCORD_WEBHOOK"
