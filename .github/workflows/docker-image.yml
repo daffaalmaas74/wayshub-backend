@@ -1,132 +1,145 @@
 name: Workflow Wayshub-backend
 
 on:
-  push:
-    branches: ["master"]
+push:
+branches: ["master"]
 
-  pull_request:
-    branches: ["master"]
+pull_request:
+branches: ["master"]
 
 jobs:
 
-  build:
-    runs-on: ubuntu-22.04
-    environment: development
+build:
+runs-on: ubuntu-22.04
+environment: development
 
-    steps:
-      - name: Checkout SCM
-        uses: actions/checkout@v4
+steps:
 
-      - name: Build image
-        run: |
-          docker compose build
+  - name: Checkout SCM
+    uses: actions/checkout@v4
 
-      - name: Docker login
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
-
-      - name: Push image
-        run: |
-          docker push daffaalmaas74/wayshub-backend:development
+  - name: Build image
+    run: |
+      docker compose build
 
 
-  testing:
-    needs: build
-    runs-on: ubuntu-22.04
-    environment: development
+testing:
+needs: build
+runs-on: ubuntu-22.04
+environment: development
 
-    steps:
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.1
-        with:
-          ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
+steps:
 
-      - name: Testing backend
-        env:
-          BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
+  - name: Setup SSH Agent
+    uses: webfactory/ssh-agent@v0.9.1
+    with:
+      ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
 
-        run: |
-          ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
+  - name: Testing backend
+    env:
+      BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
 
-          cd ~/wayshub-backend
+    run: |
+      ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
 
-          docker compose down
+      cd ~/wayshub-backend
 
-          docker rm -f backend-testing 2>/dev/null || true
+      docker compose down
+
+      docker rm -f backend-testing 2>/dev/null || true
+
+      docker pull daffaalmaas74/wayshub-backend:development
+
+      docker run -d \
+        --name backend-testing \
+        --network daffaalmaas \
+        -p 5000:5000 \
+        daffaalmaas74/wayshub-backend:development
+
+      sleep 15
+
+      HTTP_CODE=$(curl \
+        --max-time 10 \
+        -s \
+        -o /dev/null \
+        -w "%{http_code}" \
+        http://localhost:5000)
+
+      if [ "$HTTP_CODE" -ge 100 ] && [ "$HTTP_CODE" -lt 500 ]; then
+
+          docker stop backend-testing
+          docker rm backend-testing
+
+      else
+
+          docker logs backend-testing
+
+          docker stop backend-testing || true
+          docker rm backend-testing || true
+
 
           docker pull daffaalmaas74/wayshub-backend:development
 
-          docker run -d \
-            --name backend-testing \
-            --network daffaalmaas \
-            -p 5000:5000 \
-            daffaalmaas74/wayshub-backend:development
-
-          sleep 15
-
-          HTTP_CODE=$(curl \
-            --max-time 10 \
-            -s \
-            -o /dev/null \
-            -w "%{http_code}" \
-            http://localhost:5000)
-
-          if [ "$HTTP_CODE" -ge 100 ] && [ "$HTTP_CODE" -lt 500 ]; then
-
-              echo "Testing berhasil."
-              echo "Backend dapat diakses di localhost:5000"
-              echo "HTTP Status: $HTTP_CODE"
-
-              docker stop backend-testing
-              docker rm backend-testing
-
-          else
-
-              echo "Testing gagal."
-              echo "Backend tidak dapat diakses di localhost:5000"
-
-              docker logs backend-testing
-
-              docker stop backend-testing || true
-              docker rm backend-testing || true
-
-              echo "Menjalankan kembali backend production..."
-
-              docker compose up -d
-
-              exit 1
-
-          fi
-
-          EOF
-
-
-  deploy:
-    needs: testing
-    runs-on: ubuntu-22.04
-    environment: development
-
-    steps:
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.1
-        with:
-          ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
-
-      - name: Deploy backend
-        env:
-          BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
-
-        run: |
-          ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
-
-          cd ~/wayshub-backend
-
-          docker compose pull
-
-          docker compose down
 
           docker compose up -d
 
-          EOF
+          exit 1
+
+      fi
+
+      EOF
+
+
+push:
+needs: testing
+runs-on: ubuntu-22.04
+environment: development
+
+steps:
+
+  - name: Checkout SCM
+    uses: actions/checkout@v4
+
+  - name: Build image
+    run: |
+      docker compose build
+
+  - name: Docker login
+    uses: docker/login-action@v3
+    with:
+      username: ${{ secrets.DOCKER_USERNAME }}
+      password: ${{ secrets.DOCKER_TOKEN }}
+
+  - name: Push image
+    run: |
+      docker push daffaalmaas74/wayshub-backend:development
+
+
+deploy:
+needs: push
+runs-on: ubuntu-22.04
+environment: development
+
+steps:
+
+  - name: Setup SSH Agent
+    uses: webfactory/ssh-agent@v0.9.1
+    with:
+      ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
+
+  - name: Deploy backend
+    env:
+      BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
+
+    run: |
+      ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
+
+      cd ~/wayshub-backend
+
+      docker compose pull
+
+      docker compose down
+
+      docker compose up -d
+
+      EOF
