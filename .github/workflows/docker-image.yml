@@ -67,7 +67,7 @@ jobs:
 
           sleep 15
 
-          if wget --spider --timeout=10 http://localhost:5000; then
+          if wget --spider --timeout=10 http://localhost:5000/health; then
 
               echo "Testing berhasil."
 
