@@ -14,7 +14,6 @@ runs-on: ubuntu-22.04
 environment: development
 
 steps:
-
   - name: Setup SSH Agent
     uses: webfactory/ssh-agent@v0.9.1
     with:
@@ -23,7 +22,6 @@ steps:
   - name: Build image
     env:
       BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
-
     run: |
       ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
 
@@ -38,22 +36,20 @@ steps:
       EOF
 
 
-test:
+testing:
 needs: build
 runs-on: ubuntu-22.04
 environment: development
 
 steps:
-
   - name: Setup SSH Agent
     uses: webfactory/ssh-agent@v0.9.1
     with:
       ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
 
-  - name: Test image
+  - name: Testing
     env:
       BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
-
     run: |
       ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
 
@@ -88,8 +84,6 @@ steps:
           docker stop backend-testing || true
           docker rm backend-testing || true
 
-          docker rmi wayshub-backend:testing || true
-
           docker compose up -d
 
           exit 1
@@ -100,12 +94,11 @@ steps:
 
 
 push:
-needs: test
+needs: testing
 runs-on: ubuntu-22.04
 environment: development
 
 steps:
-
   - name: Setup SSH Agent
     uses: webfactory/ssh-agent@v0.9.1
     with:
@@ -116,7 +109,6 @@ steps:
       BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
-
     run: |
       ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << EOF
 
@@ -142,7 +134,6 @@ runs-on: ubuntu-22.04
 environment: development
 
 steps:
-
   - name: Setup SSH Agent
     uses: webfactory/ssh-agent@v0.9.1
     with:
@@ -151,7 +142,6 @@ steps:
   - name: Deploy
     env:
       BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
-
     run: |
       ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
 
