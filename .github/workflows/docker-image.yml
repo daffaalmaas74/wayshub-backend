@@ -1,156 +1,152 @@
 name: Workflow Wayshub-backend
 
 on:
-push:
-branches: ["master"]
+  push:
+    branches: ["master"]
 
-pull_request:
-branches: ["master"]
+  pull_request:
+    branches: ["master"]
 
 jobs:
+  build:
+    runs-on: ubuntu-22.04
+    environment: development
 
-build:
-runs-on: ubuntu-22.04
-environment: development
+    steps:
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
 
-steps:
-  - name: Setup SSH Agent
-    uses: webfactory/ssh-agent@v0.9.1
-    with:
-      ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
+      - name: Build image
+        env:
+          BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
+        run: |
+          ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
 
-  - name: Build image
-    env:
-      BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
-    run: |
-      ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
+          cd ~/wayshub-backend
 
-      cd ~/wayshub-backend
+          docker compose down
 
-      docker compose down
+          docker build \
+            -t wayshub-backend:testing \
+            .
 
-      docker build \
-        -t wayshub-backend:testing \
-        .
+          EOF
 
-      EOF
+  testing:
+    needs: build
+    runs-on: ubuntu-22.04
+    environment: development
 
+    steps:
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
 
-testing:
-needs: build
-runs-on: ubuntu-22.04
-environment: development
+      - name: Testing
+        env:
+          BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
+        run: |
+          ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
 
-steps:
-  - name: Setup SSH Agent
-    uses: webfactory/ssh-agent@v0.9.1
-    with:
-      ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
+          cd ~/wayshub-backend
 
-  - name: Testing
-    env:
-      BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
-    run: |
-      ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
+          docker rm -f backend-testing 2>/dev/null || true
 
-      cd ~/wayshub-backend
+          docker run -d \
+            --name backend-testing \
+            --network daffaalmaas \
+            -p 5000:5000 \
+            wayshub-backend:testing
 
-      docker rm -f backend-testing 2>/dev/null || true
+          sleep 15
 
-      docker run -d \
-        --name backend-testing \
-        --network daffaalmaas \
-        -p 5000:5000 \
-        wayshub-backend:testing
+          HTTP_CODE=$(curl \
+            --max-time 10 \
+            -s \
+            -o /dev/null \
+            -w "%{http_code}" \
+            http://localhost:5000)
 
-      sleep 15
+          if [ "$HTTP_CODE" -ge 100 ] && [ "$HTTP_CODE" -lt 500 ]; then
 
-      HTTP_CODE=$(curl \
-        --max-time 10 \
-        -s \
-        -o /dev/null \
-        -w "%{http_code}" \
-        http://localhost:5000)
+              docker stop backend-testing
+              docker rm backend-testing
 
-      if [ "$HTTP_CODE" -ge 100 ] && [ "$HTTP_CODE" -lt 500 ]; then
+          else
 
-          docker stop backend-testing
-          docker rm backend-testing
+              docker logs backend-testing
 
-      else
+              docker stop backend-testing || true
+              docker rm backend-testing || true
 
-          docker logs backend-testing
+              docker compose up -d
 
-          docker stop backend-testing || true
-          docker rm backend-testing || true
+              exit 1
+
+          fi
+
+          EOF
+
+  push:
+    needs: testing
+    runs-on: ubuntu-22.04
+    environment: development
+
+    steps:
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
+
+      - name: Push image
+        env:
+          BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+        run: |
+          ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << EOF
+
+          cd ~/wayshub-backend
+
+          docker login \
+            -u "${DOCKER_USERNAME}" \
+            -p "${DOCKER_TOKEN}"
+
+          docker tag \
+            wayshub-backend:testing \
+            daffaalmaas74/wayshub-backend:development
+
+          docker push \
+            daffaalmaas74/wayshub-backend:development
+
+          EOF
+
+  deploy:
+    needs: push
+    runs-on: ubuntu-22.04
+    environment: development
+
+    steps:
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
+
+      - name: Deploy
+        env:
+          BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
+        run: |
+          ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
+
+          cd ~/wayshub-backend
+
+          docker compose pull
+
+          docker compose down
 
           docker compose up -d
 
-          exit 1
-
-      fi
-
-      EOF
-
-
-push:
-needs: testing
-runs-on: ubuntu-22.04
-environment: development
-
-steps:
-  - name: Setup SSH Agent
-    uses: webfactory/ssh-agent@v0.9.1
-    with:
-      ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
-
-  - name: Push image
-    env:
-      BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
-    run: |
-      ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << EOF
-
-      cd ~/wayshub-backend
-
-      docker login \
-        -u "${DOCKER_USERNAME}" \
-        -p "${DOCKER_TOKEN}"
-
-      docker tag \
-        wayshub-backend:testing \
-        daffaalmaas74/wayshub-backend:development
-
-      docker push \
-        daffaalmaas74/wayshub-backend:development
-
-      EOF
-
-
-deploy:
-needs: push
-runs-on: ubuntu-22.04
-environment: development
-
-steps:
-  - name: Setup SSH Agent
-    uses: webfactory/ssh-agent@v0.9.1
-    with:
-      ssh-private-key: ${{ secrets.PRIVATE_KEY_SERVER_BACKEND }}
-
-  - name: Deploy
-    env:
-      BACKEND_SERVER: ${{ secrets.SERVER_BACKEND }}
-    run: |
-      ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
-
-      cd ~/wayshub-backend
-
-      docker compose pull
-
-      docker compose down
-
-      docker compose up -d
-
-      EOF
+          EOF
