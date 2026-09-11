@@ -147,7 +147,7 @@ jobs:
             -u "${DOCKER_USERNAME}" \
             -p "${DOCKER_TOKEN}"
 
-          docker compose push
+          docker compose push backend
           EOF
 
 
@@ -170,8 +170,6 @@ jobs:
           set -e
 
           cd ~/wayshub-backend
-
-          docker compose pull
-
+          
           docker compose up -d --no-build
           EOF
