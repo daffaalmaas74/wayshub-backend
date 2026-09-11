@@ -51,21 +51,31 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no "$BACKEND_SERVER" << 'EOF'
 
-          docker pull daffaalmaas74/wayshub-backend:development
+          cd ~/wayshub-backend
+
+          docker compose down
 
           docker rm -f backend-testing 2>/dev/null || true
+
+          docker pull daffaalmaas74/wayshub-backend:development
 
           docker run -d \
             --name backend-testing \
             --network daffaalmaas \
-            -p 5001:5000 \
+            -p 5000:5000 \
             daffaalmaas74/wayshub-backend:development
 
           sleep 15
 
-          if wget --spider --timeout=10 http://localhost:5001; then
+          if wget --spider --timeout=10 http://localhost:5000; then
+
               echo "Testing berhasil."
+
+              docker stop backend-testing
+              docker rm backend-testing
+
           else
+
               echo "Testing gagal."
 
               docker logs backend-testing
@@ -73,11 +83,13 @@ jobs:
               docker stop backend-testing || true
               docker rm backend-testing || true
 
-              exit 1
-          fi
+              echo "Menjalankan kembali backend production..."
 
-          docker stop backend-testing
-          docker rm backend-testing
+              docker compose up -d
+
+              exit 1
+
+          fi
 
           EOF
 
